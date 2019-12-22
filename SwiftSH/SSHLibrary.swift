@@ -136,7 +136,6 @@ public protocol SSHLibrarySFTPChannel {
     func makeDirectory(_ path: String, mode: Int) throws
     func removeDirectory(_ path: String) throws
     func listDirectory(_ path: String) throws -> [String]
-    
 }
 
 // MARK: - SCP
