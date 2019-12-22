@@ -78,6 +78,26 @@ class SFTPTests: XCTestCase {
         XCTAssert(!folderContents.contains(folderName))
     }
 
+    func testFileRename() {
+        let originalName = "AFile"
+        let newName = "BFile"
+
+        let channel = connect()
+        XCTAssertNoThrow(try channel.openFile(originalName, flags: [.Create], mode: 0o777))
+
+        var folderContents = [String]()
+        XCTAssertNoThrow(folderContents = try channel.listDirectory("."))
+        XCTAssert(folderContents.contains(originalName))
+
+        XCTAssertNoThrow(try channel.rename(source: originalName, destination: newName, flags: []))
+
+        XCTAssertNoThrow(folderContents = try channel.listDirectory("."))
+        XCTAssert(!folderContents.contains(originalName))
+        XCTAssert(folderContents.contains(newName))
+
+        XCTAssertNoThrow(try channel.removeFile(newName))
+    }
+
     private func connect() -> SSHLibrarySFTPChannel
     {
         let expectation = XCTestExpectation(description: "Authenticate")
