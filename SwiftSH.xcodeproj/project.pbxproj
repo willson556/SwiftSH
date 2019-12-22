@@ -29,6 +29,7 @@
 		7D148D10212262DE009C1CCC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7D148D0F212262DE009C1CCC /* Assets.xcassets */; };
 		7D89F9D11F535D7A00672446 /* Libssh2.h in Headers */ = {isa = PBXBuildFile; fileRef = 7D89F9CF1F535D7A00672446 /* Libssh2.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7D89F9D21F535D7A00672446 /* Libssh2.m in Sources */ = {isa = PBXBuildFile; fileRef = 7D89F9D01F535D7A00672446 /* Libssh2.m */; };
+		D95F788623AF777E0091631A /* SFTPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D95F788523AF777E0091631A /* SFTPTests.swift */; };
 		D96E2A14235C28EF00DA1970 /* SwiftSH.h in Headers */ = {isa = PBXBuildFile; fileRef = D96E2A12235C28EF00DA1970 /* SwiftSH.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D96E2A1E235C2AE700DA1970 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 180BD21B1B4C7367000DB241 /* libz.tbd */; };
 		D96E2A21235C2BAD00DA1970 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180BD2191B4C6910000DB241 /* Session.swift */; };
@@ -85,6 +86,7 @@
 		7D148D0F212262DE009C1CCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7D89F9CF1F535D7A00672446 /* Libssh2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Libssh2.h; sourceTree = "<group>"; };
 		7D89F9D01F535D7A00672446 /* Libssh2.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Libssh2.m; sourceTree = "<group>"; };
+		D95F788523AF777E0091631A /* SFTPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPTests.swift; sourceTree = "<group>"; };
 		D96E2A10235C28EF00DA1970 /* SwiftSH.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SwiftSH.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D96E2A12235C28EF00DA1970 /* SwiftSH.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SwiftSH.h; sourceTree = "<group>"; };
 		D96E2A13235C28EF00DA1970 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				7D148D0D21225D46009C1CCC /* AuthenticationTests.swift */,
 				7D148CFE21225961009C1CCC /* Info.plist */,
 				7D148D0F212262DE009C1CCC /* Assets.xcassets */,
+				D95F788523AF777E0091631A /* SFTPTests.swift */,
 			);
 			path = "SwiftSH Integration Tests";
 			sourceTree = "<group>";
@@ -437,6 +440,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D95F788623AF777E0091631A /* SFTPTests.swift in Sources */,
 				7D148D0E21225D46009C1CCC /* AuthenticationTests.swift in Sources */,
 				7D148D0B21225C5E009C1CCC /* Config.swift in Sources */,
 			);

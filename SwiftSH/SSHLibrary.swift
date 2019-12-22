@@ -50,6 +50,7 @@ public protocol SSHLibrarySession {
     var timeout: Int { get set }
     
     func makeChannel() -> SSHLibraryChannel
+    func makeSFTPChannel() -> SSHLibrarySFTPChannel
     func setBanner(_ banner: String) throws
     func handshake(_ socket: CFSocket) throws
     func fingerprint(_ hashType: FingerprintHashType) -> String?
@@ -86,7 +87,55 @@ public protocol SSHLibraryChannel {
 
 // MARK: - SFTP
 
-public protocol SSHLibrarySFTP {
+public struct FileOpenOptions: OptionSet {
+    public let rawValue: UInt
+    
+    public init(rawValue: UInt) {
+        self.rawValue = rawValue
+    }
+    
+    public static let Read = FileOpenOptions(rawValue: 1 << 0)
+    public static let Write = FileOpenOptions(rawValue: 1 << 1)
+    public static let Append = FileOpenOptions(rawValue: 1 << 2)
+    public static let Create = FileOpenOptions(rawValue: 1 << 3)
+    public static let Truncate = FileOpenOptions(rawValue: 1 << 4)
+    public static let Exclude = FileOpenOptions(rawValue: 1 << 5)
+}
+
+public struct RenameOptions: OptionSet {
+    public let rawValue : UInt
+    
+    public init(rawValue: UInt) {
+        self.rawValue = rawValue
+    }
+    
+    public static let Overwrite = FileOpenOptions(rawValue: 1 << 0)
+    public static let Atomic = FileOpenOptions(rawValue: 1 << 1)
+    public static let Native = FileOpenOptions(rawValue: 1 << 2)
+}
+
+public protocol SSHLibrarySFTPFile {
+    func getCurrentPosition() throws -> UInt64
+    func seek(offset: UInt64) throws
+    func read() throws -> Data
+    func write(_ data: Data) -> (error: Error?, bytesSent: ssize_t)
+    
+    func close() throws
+}
+
+public protocol SSHLibrarySFTPChannel {
+    var opened: Bool { get }
+    
+    func openChannel() throws
+    func closeChannel() throws
+    
+    func openFile(_ path: String, flags: FileOpenOptions, mode: Int) throws -> SSHLibrarySFTPFile
+    func removeFile(_ path: String) throws
+    func rename(source: String, destination: String, flags: RenameOptions) throws
+    
+    func makeDirectory(_ path: String, mode: Int) throws
+    func removeDirectory(_ path: String) throws
+    func listDirectory(_ path: String) throws -> [String]
     
 }
 

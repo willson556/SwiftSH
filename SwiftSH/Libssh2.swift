@@ -184,7 +184,6 @@ fileprivate extension Int32 {
 extension Libssh2 {
 
     fileprivate class Session: SSHLibrarySession {
-
         var session: OpaquePointer!
         var keyboardInteractiveCallback: ((String) -> String)?
         var lastError: Error {
@@ -370,6 +369,9 @@ extension Libssh2 {
             }
         }
 
+        func makeSFTPChannel() -> SSHLibrarySFTPChannel {
+            return SFTPChannel(session: self.session)
+        }
     }
 
 }
@@ -581,6 +583,254 @@ extension Libssh2 {
 
 }
 
+extension Libssh2 {
+
+    fileprivate class SFTPChannel : SSHLibrarySFTPChannel {
+        var session: OpaquePointer
+        var channel: OpaquePointer?
+        var bufferSize: Int = 32_768
+
+        var opened: Bool {
+            return self.channel != nil
+        }
+
+        init(session: OpaquePointer) {
+            self.session = session
+        }
+
+        deinit {
+            if let channel = self.channel {
+                libssh2_sftp_shutdown(channel)
+            }
+        }
+
+        func openChannel() throws {
+            if self.channel != nil {
+                try closeChannel()
+            }
+
+            self.channel = try
+                libssh2_function(self.session, sftp: self.channel) { session in
+                    libssh2_sftp_init(session)
+            }
+        }
+
+        func closeChannel() throws {
+            if let channel = self.channel {
+                try libssh2_function(sftp: self.channel) { libssh2_sftp_shutdown(channel) }
+            }
+
+            self.channel = nil
+        }
+
+        func openFile(_ path: String, flags: FileOpenOptions, mode: Int) throws -> SSHLibrarySFTPFile {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            let handle = try libssh2_function(self.session, sftp: self.channel) { session in
+                libssh2_sftp_open_ex(channel,
+                                     path,
+                                     CUnsignedInt(path.utf8.count),
+                                     flags.rawValue,
+                                     mode,
+                                     LIBSSH2_SFTP_OPENFILE)
+            }
+
+            return SFTPFile(channel: channel, handle: handle)
+        }
+
+        func removeFile(_ path: String) throws {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            try libssh2_function(sftp: self.channel) {
+                libssh2_sftp_unlink_ex(channel, path, UInt32(path.utf8.count))
+            }
+        }
+
+        func rename(source: String, destination: String, flags: RenameOptions) throws {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            try libssh2_function(sftp: self.channel) {
+                libssh2_sftp_rename_ex(channel, source, UInt32(source.utf8.count), destination, UInt32(destination.utf8.count), Int(flags.rawValue))
+            }
+        }
+
+        func makeDirectory(_ path: String, mode: Int) throws {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            try libssh2_function(sftp: self.channel) {
+                libssh2_sftp_mkdir_ex(channel, path, UInt32(path.utf8.count), mode)
+            }
+        }
+
+        func removeDirectory(_ path: String) throws {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            try libssh2_function(sftp: self.channel) {
+                libssh2_sftp_rmdir_ex(channel, path, UInt32(path.utf8.count))
+            }
+        }
+
+        func listDirectory(_ path: String) throws -> [String] {
+            guard let channel = self.channel else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            let dirHandle = try libssh2_function(self.session, sftp: self.channel) { session in
+                libssh2_sftp_open_ex(channel, path, UInt32(path.utf8.count), 0, 0, LIBSSH2_SFTP_OPENDIR)
+            }
+            defer {
+                try! libssh2_function(sftp: self.channel) { libssh2_sftp_close_handle(dirHandle) }
+            }
+
+            let bufferSize = self.bufferSize
+            let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: bufferSize)
+            defer {
+                buffer.deallocate()
+            }
+
+            let longEntryBuffer = UnsafeMutablePointer<Int8>.allocate(capacity: bufferSize)
+            defer {
+                longEntryBuffer.deallocate()
+            }
+
+            let attributesBuffer = UnsafeMutablePointer<LIBSSH2_SFTP_ATTRIBUTES>.allocate(capacity: 1)
+
+            var files = [String]()
+            var returnCode: Int32
+            repeat {
+                returnCode = libssh2_sftp_readdir_ex(dirHandle, buffer, bufferSize, longEntryBuffer, bufferSize, attributesBuffer)
+
+                guard returnCode >= 0 || returnCode == Int(LIBSSH2_ERROR_EAGAIN) else {
+                    throw returnCode.error
+                }
+
+                if returnCode > 0 {
+                    files.append(String(cString: buffer))
+                }
+            } while returnCode > 0
+
+            return files
+        }
+    }
+
+}
+
+extension Libssh2 {
+
+    fileprivate class SFTPFile : SSHLibrarySFTPFile {
+        var channel: OpaquePointer
+        var handle: OpaquePointer?
+        var bufferSize: Int = 32_768
+
+        init(channel: OpaquePointer, handle: OpaquePointer) {
+            self.channel = channel
+            self.handle = handle
+        }
+
+        deinit {
+            if let handle = self.handle {
+                libssh2_sftp_close_handle(handle)
+            }
+        }
+
+        func getCurrentPosition() throws -> UInt64 {
+            guard let handle = self.handle else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            return libssh2_sftp_tell64(handle)
+        }
+
+        func seek(offset: UInt64) throws {
+            guard let handle = self.handle else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            return libssh2_sftp_seek64(handle, offset)
+        }
+
+        func read() throws -> Data {
+            guard let handle = self.handle else {
+                throw SSHError.SFTP.invalidHandle
+            }
+
+            let bufferSize = self.bufferSize
+            let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: bufferSize)
+            defer {
+                buffer.deallocate()
+            }
+
+            var data = Data()
+            var returnCode: Int
+            repeat {
+                returnCode = libssh2_sftp_read(handle, buffer, bufferSize)
+
+                guard returnCode >= 0 || returnCode == Int(LIBSSH2_ERROR_EAGAIN) else {
+                    throw returnCode.error
+                }
+
+                if returnCode > 0 {
+                    buffer.withMemoryRebound(to: UInt8.self, capacity: returnCode) {
+                        data.append(UnsafePointer($0), count: returnCode)
+                    }
+                }
+            } while returnCode > 0
+
+            return data
+        }
+
+        func write(_ data: Data) -> (error: Error?, bytesSent: ssize_t) {
+            guard let handle = self.handle else {
+                return (error: SSHError.SFTP.invalidHandle, bytesSent: 0)
+            }
+
+            guard !data.isEmpty else {
+                return (error: nil, bytesSent: 0)
+            }
+
+            return data.withUnsafeBytes {
+                let buffer = $0.bindMemory(to: Int8.self)
+                let bufferSize = self.bufferSize
+
+                var bytesSent = 0
+                repeat {
+                    let length = min(data.count - bytesSent, bufferSize)
+                    let returnCode = libssh2_sftp_write(handle, buffer.baseAddress?.advanced(by: bytesSent), length)
+
+                    guard returnCode >= 0 || returnCode == Int(LIBSSH2_ERROR_EAGAIN) else {
+                        return (error: returnCode.error, bytesSent: bytesSent)
+                    }
+
+                    if returnCode > 0 {
+                        bytesSent += returnCode
+                    }
+                } while bytesSent < data.count
+
+                return (error: nil, bytesSent: bytesSent)
+            }
+        }
+
+        func close() throws {
+            if let handle = self.handle {
+                try libssh2_function(sftp: self.channel) { libssh2_sftp_close_handle(handle) }
+            }
+
+            self.handle = nil
+        }
+    }
+
+}
+
 private func libssh2_success(_ function: () -> Int32) -> Bool {
     var returnCode: Int32
     repeat {
@@ -590,18 +840,21 @@ private func libssh2_success(_ function: () -> Int32) -> Bool {
     return returnCode == 0
 }
 
-private func libssh2_function(_ function: () -> Int32) throws {
+private func libssh2_function(sftp: OpaquePointer? = nil,
+                              _ function: () -> Int32) throws {
     var returnCode: Int32
     repeat {
         returnCode = function()
     } while returnCode == LIBSSH2_ERROR_EAGAIN
 
     guard returnCode == 0 else {
-        throw returnCode.error
+        throw returnCode.error(sftp: sftp)
     }
 }
 
-private func libssh2_function<T>(_ session: OpaquePointer, function: (OpaquePointer) -> T?) throws -> T {
+private func libssh2_function<T>(_ session: OpaquePointer,
+                                 sftp: OpaquePointer? = nil,
+                                 function: (OpaquePointer) -> T?) throws -> T {
     var result: T?
     var returnCode: Int32
     repeat {
@@ -610,7 +863,7 @@ private func libssh2_function<T>(_ session: OpaquePointer, function: (OpaquePoin
     } while returnCode == LIBSSH2_ERROR_EAGAIN
 
     guard result != nil else {
-        throw returnCode.error
+        throw returnCode.error(sftp: sftp)
     }
 
     return result!
